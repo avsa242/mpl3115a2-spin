@@ -69,6 +69,17 @@ PUB Defaults{}
 ' Set factory defaults
     reset{}
 
+PUB Preset_Active{}
+' Like Defaults(), but
+'   * continuous sensor measurement
+    reset{}
+    opmode(CONT)
+
+PUB DeviceID{}: id
+' Read device identification
+'   Returns: $C4
+    readreg(core#WHO_AM_I, 1, @id)
+
 PUB Measure{} | tmp, meas
 ' Perform measurement
     tmp := 0
@@ -83,17 +94,6 @@ PUB Measure{} | tmp, meas
             tmp &= core#OST_MASK                ' bit doesn't auto-clear in
             writereg(core#CTRL_REG1, 1, @tmp)   '   CONT mode; do it manually
 
-PUB Preset_Active{}
-' Like Defaults(), but
-'   * continuous sensor measurement
-    reset{}
-    opmode(CONT)
-
-PUB DeviceID{}: id
-' Read device identification
-'   Returns: $C4
-    readreg(core#WHO_AM_I, 1, @id)
-
 PUB OpMode(mode): curr_mode
 ' Set operating mode
 '   Valid values:
@@ -106,6 +106,30 @@ PUB OpMode(mode): curr_mode
             writereg(core#CTRL_REG1, 1, @mode)
         other:
             return (curr_mode & 1)
+
+    mode := ((curr_mode & core#SBYB_MASK) | mode)
+    writereg(core#CTRL_REG1, 1, @mode)
+
+PUB Oversampling(ratio): curr_ratio | opmd_orig
+' Set output data ratio
+'   Valid values: 1, 2, 4, 8, 16, 32, 64, 128
+'   Any other value polls the chip and returns the current setting
+    curr_ratio := 0
+    readreg(core#CTRL_REG1, 1, @curr_ratio)
+    case ratio
+        1, 2, 4, 8, 16, 32, 64, 128:
+            ratio := lookdownz(ratio: 1, 2, 4, 8, 16, 32, 64, 128) << core#OS
+        other:
+            curr_ratio := (curr_ratio >> core#OS) & core#OS_BITS
+            return lookupz(curr_ratio: 1, 2, 4, 8, 16, 32, 64, 128)
+
+    opmd_orig := opmode(-2)                     ' get current opmode
+    ' must be in standby/SINGLE mode to set certain bits in this reg, so
+    '   clear the opmode bit
+    ratio := ((curr_ratio & core#OS_MASK & core#SBYB_MASK) | ratio)
+    writereg(core#CTRL_REG1, 1, @ratio)
+    if opmd_orig == CONT                        ' restore opmode, if it
+        opmode(opmd_orig)                       ' was CONT, previously
 
 PUB PressData{}: press_adc
 ' Read pressure data

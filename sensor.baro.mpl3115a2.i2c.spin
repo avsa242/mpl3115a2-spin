@@ -13,13 +13,17 @@
 
 CON
 
-    SLAVE_WR          = core#SLAVE_ADDR
-    SLAVE_RD          = core#SLAVE_ADDR|1
+    SLAVE_WR        = core#SLAVE_ADDR
+    SLAVE_RD        = core#SLAVE_ADDR|1
 
-    DEF_SCL           = 28
-    DEF_SDA           = 29
-    DEF_HZ            = 100_000
-    I2C_MAX_FREQ      = core#I2C_MAX_FREQ
+    DEF_SCL         = 28
+    DEF_SDA         = 29
+    DEF_HZ          = 100_000
+    I2C_MAX_FREQ    = core#I2C_MAX_FREQ
+
+' Operating modes
+    SLEEP           = 0
+    CONT            = 1
 
 VAR
 
@@ -58,14 +62,47 @@ PUB Stop{}
 
 PUB Defaults{}
 ' Set factory defaults
+    reset{}
+
+PUB Preset_Active{}
+' Like Defaults(), but
+'   * sensor measurement active
+    reset{}
+    opmode(CONT)
 
 PUB DeviceID{}: id
 ' Read device identification
 '   Returns: $C4
     readreg(core#WHO_AM_I, 1, @id)
 
-PUB Reset{}
+PUB OpMode(mode): curr_mode
+' Set operating mode
+'   Valid values:
+'       SLEEP (0): Sleep/standby
+'       CONT (1): Continuous measurement
+    curr_mode := 0
+    readreg(core#CTRL_REG1, 1, @curr_mode)
+    case mode
+        SLEEP, CONT:
+            writereg(core#CTRL_REG1, 1, @mode)
+        other:
+            return (curr_mode & 1)
+
+PUB PressData{}: press_adc
+' Read pressure data
+'   Returns: s20 (Q18.2 fixed-point)
+    readreg(core#OUT_P_MSB, 3, @press_adc)
+
+PUB PressPascals{}: press | p_frac
+' Read pressure data, in Pascals
+    press := pressdata >> 4
+    p_frac := press & %11
+    return ((press >> 2) * 10) + p_frac         ' ((p / 4) * 10) + (p // 4)
+
+PUB Reset{} | tmp
 ' Reset the device
+    tmp := (1 << core#RST)
+    writereg(core#CTRL_REG1, 1, @tmp)
 
 PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
 ' Read nr_bytes from the device into ptr_buff
@@ -74,7 +111,7 @@ PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
             cmd_pkt.byte[0] := SLAVE_WR
             cmd_pkt.byte[1] := reg_nr
             i2c.start{}
-            i2c.wrblock_lsbf(@cmd_pkt, 2)
+            i2c.wrblock_msbf(@cmd_pkt, 2)
             i2c.start{}
             i2c.wr_byte(SLAVE_RD)
 
@@ -94,7 +131,7 @@ PRI writeReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
             i2c.wrblock_lsbf(@cmd_pkt, 2)
 
     ' write MSByte to LSByte
-            i2c.wrblock_msbf(ptr_buff, nr_bytes)
+            i2c.wrblock_lsbf(ptr_buff, nr_bytes)
             i2c.stop{}
         other:
             return

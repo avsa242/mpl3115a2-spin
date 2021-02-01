@@ -28,7 +28,7 @@ CON
     OUT_P_LSB       = $03                       ' <- fractional
     OUT_P_MASK      = $FFFF0
 
-    OUT_T_MSB       = $04                       ' s12
+    OUT_T_MSB       = $04                       ' s12, Q8.4
     OUT_T_LSB       = $05                       ' <- fractional
     OUT_T_MASK      = $FF0
 

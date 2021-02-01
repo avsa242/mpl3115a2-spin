@@ -25,8 +25,13 @@ CON
     SLEEP           = 0
     CONT            = 1
 
+' Temperature scales
+    C               = 0
+    F               = 1
+
 VAR
 
+    long _temp_scale
 
 OBJ
 
@@ -104,6 +109,40 @@ PUB Reset{} | tmp
     tmp := (1 << core#RST)
     writereg(core#CTRL_REG1, 1, @tmp)
 
+PUB TempData{}: temp_adc
+' Read temperature data
+'   Returns: s12 (Q8.4 fixed-point)
+    readreg(core#OUT_T_MSB, 2, @temp_adc)
+
+PUB Temperature{}: temp
+' Current temperature, in hundredths of a degree
+'   Returns: Integer
+'   (e.g., 2105 is equivalent to 21.05 deg C)
+    temp := calctemp(tempdata{})
+    case _temp_scale
+        C:
+        F:
+            return ((temp * 9_00) / 5_00) + 32_00
+
+PUB TempScale(scale): curr_scale
+' Set temperature scale used by Temperature method
+'   Valid values:
+'      *C (0): Celsius
+'       F (1): Fahrenheit
+'   Any other value returns the current setting
+    case scale
+        C, F:
+            _temp_scale := scale
+        other:
+            return _temp_scale
+
+PRI calcTemp(temp_word): temp_c | whole, part
+' Calculate temperature in degrees Celsius, given ADC word
+    temp_word := (temp_word << 16) ~> 20        ' extend sign bit
+    whole := (temp_word >> 4) * 100             ' scale up to hundredths
+    part := (temp_word & %1111)                 ' fractional part
+    return whole+part
+
 PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
 ' Read nr_bytes from the device into ptr_buff
     case reg_nr                                 ' validate register num
@@ -111,7 +150,7 @@ PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
             cmd_pkt.byte[0] := SLAVE_WR
             cmd_pkt.byte[1] := reg_nr
             i2c.start{}
-            i2c.wrblock_msbf(@cmd_pkt, 2)
+            i2c.wrblock_lsbf(@cmd_pkt, 2)
             i2c.start{}
             i2c.wr_byte(SLAVE_RD)
 
@@ -131,7 +170,7 @@ PRI writeReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
             i2c.wrblock_lsbf(@cmd_pkt, 2)
 
     ' write MSByte to LSByte
-            i2c.wrblock_lsbf(ptr_buff, nr_bytes)
+            i2c.wrblock_msbf(ptr_buff, nr_bytes)
             i2c.stop{}
         other:
             return

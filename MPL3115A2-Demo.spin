@@ -24,6 +24,9 @@ CON
     I2C_HZ      = 400_000
 ' --
 
+    C           = 0
+    F           = 1
+
 OBJ
 
     cfg     : "core.con.boardcfg.flip"
@@ -36,15 +39,26 @@ PUB Main{}
 
     setup{}
     baro.preset_active{}
+    baro.tempscale(C)
 
     repeat
         ser.position(0, 3)
         presscalc{}
+        tempcalc{}
 
-PUB PressCalc{} | press
+PUB PressCalc{}
 
     ser.str(string("Barometric pressure: "))
-    decimal(baro.presspascals, 10)
+    decimal(baro.presspascals{}, 10)
+    ser.clearline{}
+    ser.newline{}
+
+PUB TempCalc{}
+
+    ser.str(string("Temperature: "))
+    decimal(baro.temperature, 100)
+    ser.clearline{}
+    ser.newline{}
 
 PRI Decimal(scaled, divisor) | whole[4], part[4], places, tmp, sign
 ' Display a scaled up number as a decimal

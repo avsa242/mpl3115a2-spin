@@ -69,6 +69,20 @@ PUB Defaults{}
 ' Set factory defaults
     reset{}
 
+PUB Measure{} | tmp, meas
+' Perform measurement
+    tmp := 0
+    readreg(core#CTRL_REG1, 1, @tmp)
+    case opmode(-2)
+        SINGLE:
+            tmp |= (1 << core#OST)              ' bit auto-clears in SINGLE
+            writereg(core#CTRL_REG1, 1, @tmp)   '   mode
+        CONT:
+            tmp |= (1 << core#OST)
+            writereg(core#CTRL_REG1, 1, @tmp)
+            tmp &= core#OST_MASK                ' bit doesn't auto-clear in
+            writereg(core#CTRL_REG1, 1, @tmp)   '   CONT mode; do it manually
+
 PUB Preset_Active{}
 ' Like Defaults(), but
 '   * continuous sensor measurement

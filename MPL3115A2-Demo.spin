@@ -1,8 +1,8 @@
 {
     --------------------------------------------
     Filename: MPL3115A2-Demo.spin
-    Author:
-    Description:
+    Author: Jesse Burt
+    Description: Demo of the MPL3115A2 driver
     Copyright (c) 2021
     Started Feb 01, 2021
     Updated Feb 01, 2021

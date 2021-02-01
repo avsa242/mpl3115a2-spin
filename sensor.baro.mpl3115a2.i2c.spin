@@ -1,8 +1,9 @@
 {
     --------------------------------------------
     Filename: sensor.baro.mpl3115a2.i2c.spin
-    Author:
-    Description:
+    Author: Jesse Burt
+    Description: Driver for MPL3115A2 Pressure
+        sensor with altimetry
     Copyright (c) 2021
     Started Feb 01, 2021
     Updated Feb 01, 2021

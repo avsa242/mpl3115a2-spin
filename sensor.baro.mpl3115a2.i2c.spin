@@ -22,7 +22,7 @@ CON
     I2C_MAX_FREQ    = core#I2C_MAX_FREQ
 
 ' Operating modes
-    SLEEP           = 0
+    SINGLE          = 0
     CONT            = 1
 
 ' Temperature scales
@@ -71,7 +71,7 @@ PUB Defaults{}
 
 PUB Preset_Active{}
 ' Like Defaults(), but
-'   * sensor measurement active
+'   * continuous sensor measurement
     reset{}
     opmode(CONT)
 
@@ -83,12 +83,12 @@ PUB DeviceID{}: id
 PUB OpMode(mode): curr_mode
 ' Set operating mode
 '   Valid values:
-'       SLEEP (0): Sleep/standby
+'       SINGLE (0): Single-shot/standby
 '       CONT (1): Continuous measurement
     curr_mode := 0
     readreg(core#CTRL_REG1, 1, @curr_mode)
     case mode
-        SLEEP, CONT:
+        SINGLE, CONT:
             writereg(core#CTRL_REG1, 1, @mode)
         other:
             return (curr_mode & 1)

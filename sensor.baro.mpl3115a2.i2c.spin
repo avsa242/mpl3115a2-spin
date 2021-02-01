@@ -108,6 +108,7 @@ PUB Reset{} | tmp
 ' Reset the device
     tmp := (1 << core#RST)
     writereg(core#CTRL_REG1, 1, @tmp)
+    time.usleep(core#T_POR)
 
 PUB TempData{}: temp_adc
 ' Read temperature data

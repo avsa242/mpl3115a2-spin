@@ -8,8 +8,9 @@ This is a P8X32A/Propeller, ~~P2X8C4M64P/Propeller 2~~ driver object for the MPL
 ## Salient Features
 
 * I2C connection at up to 400kHz
-* Read barometric pressure (raw, Pascals)
+* Read barometric pressure (raw, tenths of a Pascal)
 * Read temperature (raw, hundredths of a degree)
+* Read altitude (raw, centimeters)
 
 ## Requirements
 

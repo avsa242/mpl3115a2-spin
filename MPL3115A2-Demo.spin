@@ -52,7 +52,6 @@ PUB Main{}
     baro.tempscale(C)                           ' C, F
     baro.sealevelpress(100_100)                 ' your sea level pressure (Pa)
 
-
     case MODE
         BAR:
             repeat

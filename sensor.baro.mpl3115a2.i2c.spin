@@ -41,7 +41,7 @@ OBJ
 
 ' choose an I2C engine below
     i2c : "com.i2c"                             ' PASM I2C engine (up to ~800kHz)
-    core: "core.con.mpl3115a2.spin"             ' hw-specific low-level const's
+    core: "core.con.mpl3115a2"                  ' hw-specific low-level const's
     time: "time"                                ' basic timing functions
 
 PUB Null{}

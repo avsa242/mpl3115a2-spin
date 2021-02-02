@@ -22,10 +22,16 @@ CON
     I2C_SCL     = 28
     I2C_SDA     = 29
     I2C_HZ      = 400_000
+
+    MODE        = BAR                           ' ALT(itude) or BAR(ometer)
 ' --
 
+    BAR         = 0
+    ALT         = 1
     C           = 0
     F           = 1
+
+    DAT_X_COL   = 25
 
 OBJ
 
@@ -38,17 +44,39 @@ OBJ
 PUB Main{}
 
     setup{}
-    baro.preset_active{}
-    baro.tempscale(C)
+    baro.preset_active{}                        ' set defaults, but enable
+                                                ' sensor power
 
-    repeat
-        ser.position(0, 3)
-        presscalc{}
-        tempcalc{}
+    baro.altbaromode(MODE)
+
+    baro.tempscale(C)                           ' C, F
+    baro.sealevelpress(100_100)                 ' your sea level pressure (Pa)
+
+
+    case MODE
+        BAR:
+            repeat
+                ser.position(0, 3)
+                presscalc{}
+                tempcalc{}
+        ALT:
+            repeat
+                ser.position(0, 3)
+                altcalc{}
+                tempcalc{}
+
+PUB AltCalc{} | a, fa, altf
+
+    ser.str(string("Altitude (m):"))
+    ser.positionx(DAT_X_COL)
+    decimal(baro.altitude{}, 100)
+    ser.clearline{}
+    ser.newline{}
 
 PUB PressCalc{}
 
-    ser.str(string("Barometric pressure: "))
+    ser.str(string("Barometric pressure (Pa):"))
+    ser.positionx(DAT_X_COL)
     decimal(baro.presspascals{}, 10)
     ser.clearline{}
     ser.newline{}
@@ -56,6 +84,7 @@ PUB PressCalc{}
 PUB TempCalc{}
 
     ser.str(string("Temperature: "))
+    ser.positionx(DAT_X_COL)
     decimal(baro.temperature, 100)
     ser.clearline{}
     ser.newline{}

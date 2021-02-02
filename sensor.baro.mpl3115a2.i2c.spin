@@ -29,6 +29,10 @@ CON
     C               = 0
     F               = 1
 
+' Barometer/altitude modes
+    BARO            = 0
+    ALT             = 1
+
 VAR
 
     long _temp_scale
@@ -75,6 +79,40 @@ PUB Preset_Active{}
     reset{}
     opmode(CONT)
 
+PUB AltBaroMode(mode): curr_mode | opmd_orig
+' Set sensor to altimeter or barometer mode
+'   Valid values:
+'       BARO (0): Sensor outputs barometric pressure data
+'       ALT (1): Sensor outputs altitude data
+    curr_mode := 0
+    readreg(core#CTRL_REG1, 1, @curr_mode)
+    case mode
+        BARO, ALT:
+            mode <<= core#ALT
+        other:
+            return ((curr_mode >> core#ALT) & 1)
+
+    opmd_orig := (curr_mode & 1)                ' get current opmode
+    ' must be in standby/SINGLE mode to set certain bits in this reg, so
+    '   clear the opmode bit
+    mode := ((curr_mode & core#ALT_MASK & core#SBYB_MASK) | mode)
+    writereg(core#CTRL_REG1, 1, @mode)
+
+    if opmd_orig == CONT                        ' restore opmode, if it
+        opmode(opmd_orig)                       ' was CONT, previously
+
+PUB AltData{}: alt_adc
+' Read altimeter data
+'   NOTE: This is valid as altitude data _only_ if AltBaroMode() is
+'       set to ALT (1)
+    readreg(core#OUT_P_MSB, 3, @alt_adc)
+
+PUB Altitude{}: alt_m | a_frac
+' Read altitude, in centimeters
+'   NOTE: This is valid as altitude data _only_ if AltBaroMode() is
+'       set to ALT (1)
+    return (altdata{} * 100) >> 8
+
 PUB DeviceID{}: id
 ' Read device identification
 '   Returns: $C4
@@ -103,7 +141,6 @@ PUB OpMode(mode): curr_mode
     readreg(core#CTRL_REG1, 1, @curr_mode)
     case mode
         SINGLE, CONT:
-            writereg(core#CTRL_REG1, 1, @mode)
         other:
             return (curr_mode & 1)
 
@@ -123,7 +160,7 @@ PUB Oversampling(ratio): curr_ratio | opmd_orig
             curr_ratio := (curr_ratio >> core#OS) & core#OS_BITS
             return lookupz(curr_ratio: 1, 2, 4, 8, 16, 32, 64, 128)
 
-    opmd_orig := opmode(-2)                     ' get current opmode
+    opmd_orig := (curr_ratio & 1)               ' get current opmode
     ' must be in standby/SINGLE mode to set certain bits in this reg, so
     '   clear the opmode bit
     ratio := ((curr_ratio & core#OS_MASK & core#SBYB_MASK) | ratio)
@@ -134,19 +171,35 @@ PUB Oversampling(ratio): curr_ratio | opmd_orig
 PUB PressData{}: press_adc
 ' Read pressure data
 '   Returns: s20 (Q18.2 fixed-point)
+'   NOTE: This is valid as pressure data _only_ if AltBaroMode() is
+'       set to BARO (0)
     readreg(core#OUT_P_MSB, 3, @press_adc)
 
-PUB PressPascals{}: press | p_frac
-' Read pressure data, in Pascals
-    press := pressdata >> 4
-    p_frac := press & %11
-    return ((press >> 2) * 10) + p_frac         ' ((p / 4) * 10) + (p // 4)
+PUB PressPascals{}: press
+' Read pressure data, in tenths of a Pascal
+'   NOTE: This is valid as pressure data _only_ if AltBaroMode() is
+'       set to BARO (0)
+    return (pressdata{} * 100) / 640
 
 PUB Reset{} | tmp
 ' Reset the device
     tmp := (1 << core#RST)
     writereg(core#CTRL_REG1, 1, @tmp)
     time.usleep(core#T_POR)
+
+PUB SeaLevelPress(press): curr_press
+' Set sea-level pressure for altitude calculations, in Pascals
+'   Valid values: 0..131_070
+'   Any other value polls the chip and returns the current setting
+    curr_press := 0
+    readreg(core#BAR_IN_MSB, 2, @curr_press)
+    case press
+        0..131_070:
+            press >>= 1                         ' LSB = 2 Pascals
+        other:
+            return curr_press << 1
+
+    writereg(core#BAR_IN_MSB, 2, @press)
 
 PUB TempData{}: temp_adc
 ' Read temperature data

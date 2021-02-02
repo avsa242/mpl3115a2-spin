@@ -101,6 +101,18 @@ PUB AltBaroMode(mode): curr_mode | opmd_orig
     if opmd_orig == CONT                        ' restore opmode, if it
         opmode(opmd_orig)                       ' was CONT, previously
 
+PUB AltBias(offs): curr_offs
+' Set altitude bias/offset, in meters
+'   Valid values: -128..127
+'   Any other value polls the chip and returns the current setting
+    case offs
+        -128..127:                              ' LSB = 1m
+            writereg(core#OFF_H, 1, @offs)
+        other:
+            curr_offs := 0
+            readreg(core#OFF_H, 1, @curr_offs)
+            return ~curr_offs                   ' extend sign
+
 PUB AltData{}: alt_adc
 ' Read altimeter data
 '   NOTE: This is valid as altitude data _only_ if AltBaroMode() is
@@ -168,6 +180,19 @@ PUB Oversampling(ratio): curr_ratio | opmd_orig
     if opmd_orig == CONT                        ' restore opmode, if it
         opmode(opmd_orig)                       ' was CONT, previously
 
+PUB PressBias(offs): curr_offs
+' Set pressure bias/offset, in Pascals
+'   Valid values: -512..508
+'   Any other value polls the chip and returns the current setting
+    case offs
+        -512..508:
+            offs /= 4                           ' LSB = 4Pa
+            writereg(core#OFF_P, 1, @offs)
+        other:
+            curr_offs := 0
+            readreg(core#OFF_P, 1, @curr_offs)
+            return (~curr_offs * 4)             ' extend sign
+
 PUB PressData{}: press_adc
 ' Read pressure data
 '   Returns: s20 (Q18.2 fixed-point)
@@ -195,11 +220,25 @@ PUB SeaLevelPress(press): curr_press
     readreg(core#BAR_IN_MSB, 2, @curr_press)
     case press
         0..131_070:
-            press >>= 1                         ' LSB = 2 Pascals
+            press >>= 1                         ' LSB = 2Pa
         other:
             return curr_press << 1
 
     writereg(core#BAR_IN_MSB, 2, @press)
+
+PUB TempBias(offs): curr_offs
+' Set temperature bias/offset, in ten-thousandths of a degree C
+'   Valid values: -8_0000..7_9375
+'   Any other value polls the chip and returns the current setting
+'   Example: -3_9375 = -3.9375C
+    case offs
+        -8_0000..7_9375:
+            offs /= 0_0625                      ' LSB = 0.0625C
+            writereg(core#OFF_T, 1, @offs)
+        other:
+            curr_offs := 0
+            readreg(core#OFF_T, 1, @curr_offs)
+            return (~curr_offs * 0_0625)        ' extend sign
 
 PUB TempData{}: temp_adc
 ' Read temperature data

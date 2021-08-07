@@ -6,7 +6,7 @@
         sensor with altimetry
     Copyright (c) 2021
     Started Feb 18, 2021
-    Updated Feb 18, 2021
+    Updated Aug 7, 2021
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -41,6 +41,7 @@ OBJ
     i2c : "com.i2c"                             ' I2C engine
     core: "core.con.mpl3115a2"                  ' hw-specific low-level const's
     time: "time"                                ' basic timing functions
+    u64 : "math.unsigned64"
 
 PUB Null()
 ' This is not a top-level object
@@ -111,13 +112,18 @@ PUB AltData(): alt_adc
 ' Read altimeter data
 '   NOTE: This is valid as altitude data _only_ if AltBaroMode() is
 '       set to ALT (1)
+    alt_adc := 0
     readreg(core.OUT_P_MSB, 3, @alt_adc)
 
-PUB Altitude(): alt_m | a_frac
+PUB Altitude(): alt_cm
 ' Read altitude, in centimeters
 '   NOTE: This is valid as altitude data _only_ if AltBaroMode() is
 '       set to ALT (1)
-    return (altdata() * 100) >> 8
+    return altword2cm(altdata())
+
+PUB AltWord2CM(alt_adc): alt_cm
+' Convert altitude word to altitude, in centimeters
+    return u64.multdiv(alt_adc, 100_00, 65536)
 
 PUB DeviceID(): id
 ' Read device identification
@@ -192,13 +198,18 @@ PUB PressData(): press_adc
 '   Returns: s20 (Q18.2 fixed-point)
 '   NOTE: This is valid as pressure data _only_ if AltBaroMode() is
 '       set to BARO (0)
+    press_adc := 0
     readreg(core.OUT_P_MSB, 3, @press_adc)
 
 PUB PressPascals(): press
 ' Read pressure data, in tenths of a Pascal
 '   NOTE: This is valid as pressure data _only_ if AltBaroMode() is
 '       set to BARO (0)
-    return (pressdata() * 100) / 640
+    return pressword2pa(pressdata())
+
+PUB PressWord2Pa(p_word): p_pa
+' Convert pressure ADC word to pressure in Pascals
+    return ((p_word * 100) / 640)
 
 PUB Reset() | tmp
 ' Reset the device
@@ -237,17 +248,14 @@ PUB TempBias(offs): curr_offs
 PUB TempData(): temp_adc
 ' Read temperature data
 '   Returns: s12 (Q8.4 fixed-point)
+    temp_adc := 0
     readreg(core.OUT_T_MSB, 2, @temp_adc)
 
 PUB Temperature(): temp
 ' Current temperature, in hundredths of a degree
 '   Returns: Integer
 '   (e.g., 2105 is equivalent to 21.05 deg C)
-    temp := calctemp(tempdata())
-    case _temp_scale
-        C:
-        F:
-            return ((temp * 9_00) / 5_00) + 32_00
+    return tempword2deg(tempdata())
 
 PUB TempScale(scale): curr_scale
 ' Set temperature scale used by Temperature method
@@ -261,17 +269,23 @@ PUB TempScale(scale): curr_scale
         other:
             return _temp_scale
 
-PRI calcTemp(temp_word): temp_c | whole, part
+PUB TempWord2Deg(temp_word): temp
 ' Calculate temperature in degrees Celsius, given ADC word
-    temp_word := (temp_word << 16) sar 20       ' extend sign bit
-    whole := (temp_word >> 4) * 100             ' scale up to hundredths
-    part := (temp_word & %1111)                 ' fractional part
-    return whole+part
+    ' extend sign, chop off reserved LSBs, scale up to hundredths
+    '   divide down to scale to degrees C
+    temp := (((temp_word signx 15) sar 4) * 100) / 16
+    case _temp_scale
+        C:
+            return temp
+        F:
+            return ((temp * 9) / 5) + 32_00
+        other:
+            return FALSE
 
 PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
 ' Read nr_bytes from the device into ptr_buff
     case reg_nr                                 ' validate register num
-        core#STATUS..core#OFF_H:
+        core.STATUS..core.OFF_H:
             cmd_pkt.byte[0] := SLAVE_WR
             cmd_pkt.byte[1] := reg_nr
             i2c.start()
@@ -288,7 +302,7 @@ PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
 PRI writeReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
 ' Write nr_bytes to the device from ptr_buff
     case reg_nr
-        core#F_SETUP, core#PT_DATA_CFG..core#OFF_H:
+        core.F_SETUP, core.PT_DATA_CFG..core.OFF_H:
             cmd_pkt.byte[0] := SLAVE_WR
             cmd_pkt.byte[1] := reg_nr
             i2c.start()

@@ -5,7 +5,7 @@
     Description: Demo of the MPL3115A2 driver (P2 version)
     Copyright (c) 2021
     Started Feb 18, 2021
-    Updated Feb 18, 2021
+    Updated Aug 7, 2021
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -39,7 +39,7 @@ OBJ
     ser     : "com.serial.terminal.ansi"
     time    : "time"
     int     : "string.integer"
-    baro    : "sensor.baro.mpl3115a2.i2c"
+    baro    : "sensor.pressure.mpl3115a2.i2c"
 
 PUB Main()
 

@@ -27,14 +27,6 @@ CON
     SDA_PIN     = 29
     I2C_FREQ    = 400_000                       ' max is 400_000
     ADDR_BITS   = 0                             ' %000..%111 (0..7)
-
-    { SPI configuration }
-    CS_PIN      = 0
-    SCK_PIN     = 1                             ' SPC
-    MOSI_PIN    = 2                             ' SDI
-    MISO_PIN    = 3                             ' SDO
-'   NOTE: If MPL3115A2_SPI is #defined, and MOSI_PIN and MISO_PIN are the same,
-'   the driver will attempt to start in 3-wire SPI mode.
 ' --
 
 OBJ

@@ -11,7 +11,7 @@
     --------------------------------------------
 }
 #include "sensor.pressure-common.spin2h"
-#include "sensor.temp-common.spin2h"
+#include "sensor.temp.common.spin2h"
 
 CON
 

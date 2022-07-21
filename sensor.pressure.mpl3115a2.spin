@@ -33,8 +33,12 @@ CON
 
 OBJ
 
-' choose an I2C engine below
-    i2c : "com.i2c"                             ' PASM I2C engine (up to ~800kHz)
+{ decide: Bytecode I2C engine, or PASM? Default is PASM if BC isn't specified }
+#ifdef MPL3115A2_I2C_BC
+    i2c : "com.i2c.nocog"                       ' BC I2C engine
+#else
+    i2c : "com.i2c"                             ' PASM I2C engine
+#endif
     core: "core.con.mpl3115a2"                  ' hw-specific low-level const's
     time: "time"                                ' basic timing functions
     u64 : "math.unsigned64"                     ' 64-bit unsigned int math

@@ -1,9 +1,8 @@
 {
     --------------------------------------------
-    Filename: sensor.baro.mpl3115a2.i2c.spin
+    Filename: sensor.baro.mpl3115a2.spin
     Author: Jesse Burt
-    Description: Driver for MPL3115A2 Pressure
-        sensor with altimetry
+    Description: Driver for MPL3115A2 Pressure sensor with altimetry
     Copyright (c) 2022
     Started Feb 01, 2021
     Updated Jul 21, 2022
@@ -43,14 +42,14 @@ OBJ
     time: "time"                                ' basic timing functions
     u64 : "math.unsigned64"                     ' 64-bit unsigned int math
 
-PUB Null{}
+PUB null{}
 ' This is not a top-level object
 
 PUB Start{}: status
 ' Start using "standard" Propeller I2C pins and 100kHz
     return startx(DEF_SCL, DEF_SDA, DEF_HZ)
 
-PUB Startx(SCL_PIN, SDA_PIN, I2C_HZ): status
+PUB startx(SCL_PIN, SDA_PIN, I2C_HZ): status
 ' Start using custom IO pins and I2C bus frequency
     if lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31) and {
 }   I2C_HZ =< core#I2C_MAX_FREQ                 ' validate pins and bus freq
@@ -64,21 +63,21 @@ PUB Startx(SCL_PIN, SDA_PIN, I2C_HZ): status
     ' Lastly - make sure you have at least one free core/cog 
     return FALSE
 
-PUB Stop{}
-
+PUB stop{}
+' Stop the driver
     i2c.deinit{}
 
-PUB Defaults{}
+PUB defaults{}
 ' Set factory defaults
     reset{}
 
-PUB Preset_Active{}
+PUB preset_active{}
 ' Like Defaults(), but
 '   * continuous sensor measurement
     reset{}
     opmode(CONT)
 
-PUB AltBaroMode(mode): curr_mode | opmd_orig
+PUB altbaromode(mode): curr_mode | opmd_orig
 ' Set sensor to altimeter or barometer mode
 '   Valid values:
 '       BARO (0): Sensor outputs barometric pressure data
@@ -100,7 +99,7 @@ PUB AltBaroMode(mode): curr_mode | opmd_orig
     if opmd_orig == CONT                        ' restore opmode, if it
         opmode(opmd_orig)                       ' was CONT, previously
 
-PUB AltBias(offs): curr_offs
+PUB altbias(offs): curr_offs
 ' Set altitude bias/offset, in meters
 '   Valid values: -128..127
 '   Any other value polls the chip and returns the current setting
@@ -112,29 +111,29 @@ PUB AltBias(offs): curr_offs
             readreg(core#OFF_H, 1, @curr_offs)
             return ~curr_offs                   ' extend sign
 
-PUB AltData{}: alt_adc
+PUB altdata{}: alt_adc
 ' Read altimeter data
 '   NOTE: This is valid as altitude data _only_ if AltBaroMode() is
 '       set to ALT (1)
     alt_adc := 0
     readreg(core#OUT_P_MSB, 3, @alt_adc)
 
-PUB Altitude{}: alt_cm
+PUB altitude{}: alt_cm
 ' Read altitude, in centimeters
 '   NOTE: This is valid as altitude data _only_ if AltBaroMode() is
 '       set to ALT (1)
     return altword2cm(altdata{})
 
-PUB AltWord2CM(alt_adc): alt_cm
+PUB altword2cm(alt_adc): alt_cm
 ' Convert altitude word to altitude, in centimeters
     return u64.multdiv(alt_adc, 100_00, 65536)
 
-PUB DeviceID{}: id
+PUB deviceid{}: id
 ' Read device identification
 '   Returns: $C4
     readreg(core#WHO_AM_I, 1, @id)
 
-PUB Measure{} | tmp, meas
+PUB measure{} | tmp, meas
 ' Perform measurement
     tmp := 0
     readreg(core#CTRL_REG1, 1, @tmp)
@@ -148,7 +147,7 @@ PUB Measure{} | tmp, meas
             tmp &= core#OST_MASK                ' bit doesn't auto-clear in
             writereg(core#CTRL_REG1, 1, @tmp)   '   CONT mode; do it manually
 
-PUB OpMode(mode): curr_mode
+PUB opmode(mode): curr_mode
 ' Set operating mode
 '   Valid values:
 '       SINGLE (0): Single-shot/standby
@@ -163,7 +162,7 @@ PUB OpMode(mode): curr_mode
     mode := ((curr_mode & core#SBYB_MASK) | mode)
     writereg(core#CTRL_REG1, 1, @mode)
 
-PUB Oversampling(ratio): curr_ratio | opmd_orig
+PUB oversampling(ratio): curr_ratio | opmd_orig
 ' Set output data ratio
 '   Valid values: 1, 2, 4, 8, 16, 32, 64, 128
 '   Any other value polls the chip and returns the current setting
@@ -184,7 +183,7 @@ PUB Oversampling(ratio): curr_ratio | opmd_orig
     if opmd_orig == CONT                        ' restore opmode, if it
         opmode(opmd_orig)                       ' was CONT, previously
 
-PUB PressBias(offs): curr_offs
+PUB pressbias(offs): curr_offs
 ' Set pressure bias/offset, in Pascals
 '   Valid values: -512..508
 '   Any other value polls the chip and returns the current setting
@@ -197,7 +196,7 @@ PUB PressBias(offs): curr_offs
             readreg(core#OFF_P, 1, @curr_offs)
             return (~curr_offs * 4)             ' extend sign
 
-PUB PressData{}: press_adc
+PUB pressdata{}: press_adc
 ' Read pressure data
 '   Returns: s20 (Q18.2 fixed-point)
 '   NOTE: This is valid as pressure data _only_ if AltBaroMode() is
@@ -205,21 +204,21 @@ PUB PressData{}: press_adc
     press_adc := 0
     readreg(core#OUT_P_MSB, 3, @press_adc)
 
-PUB PressDataReady{}: flag
+PUB pressdataready{}: flag
 ' dummy method
     return true
 
-PUB PressWord2Pa(p_word): p_pa
+PUB pressword2pa(p_word): p_pa
 ' Convert pressure ADC word to pressure in Pascals
     return ((p_word * 100) / 640)
 
-PUB Reset{} | tmp
+PUB reset{} | tmp
 ' Reset the device
     tmp := (1 << core#RST)
     writereg(core#CTRL_REG1, 1, @tmp)
     time.usleep(core#T_POR)
 
-PUB SeaLevelPress(press): curr_press
+PUB sealevelpress(press): curr_press
 ' Set sea-level pressure for altitude calculations, in Pascals
 '   Valid values: 0..131_070
 '   Any other value polls the chip and returns the current setting
@@ -233,7 +232,7 @@ PUB SeaLevelPress(press): curr_press
 
     writereg(core#BAR_IN_MSB, 2, @press)
 
-PUB TempBias(offs): curr_offs
+PUB tempbias(offs): curr_offs
 ' Set temperature bias/offset, in ten-thousandths of a degree C
 '   Valid values: -8_0000..7_9375
 '   Any other value polls the chip and returns the current setting
@@ -247,13 +246,13 @@ PUB TempBias(offs): curr_offs
             readreg(core#OFF_T, 1, @curr_offs)
             return (~curr_offs * 0_0625)        ' extend sign
 
-PUB TempData{}: temp_adc
+PUB tempdata{}: temp_adc
 ' Read temperature data
 '   Returns: s12 (Q8.4 fixed-point)
     temp_adc := 0
     readreg(core#OUT_T_MSB, 2, @temp_adc)
 
-PUB TempWord2Deg(temp_word): temp
+PUB tempword2deg(temp_word): temp
 ' Calculate temperature in degrees Celsius, given ADC word
     ' extend sign, chop off reserved LSBs, scale up to hundredths
     '   divide down to scale to degrees C
@@ -266,7 +265,7 @@ PUB TempWord2Deg(temp_word): temp
         other:
             return FALSE
 
-PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
+PRI readreg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
 ' Read nr_bytes from the device into ptr_buff
     case reg_nr                                 ' validate register num
         core#STATUS..core#OFF_H:
@@ -283,7 +282,7 @@ PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
         other:                                  ' invalid reg_nr
             return
 
-PRI writeReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
+PRI writereg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
 ' Write nr_bytes to the device from ptr_buff
     case reg_nr
         core#F_SETUP, core#PT_DATA_CFG..core#OFF_H:
@@ -301,24 +300,21 @@ PRI writeReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
 
 DAT
 {
-TERMS OF USE: MIT License
+Copyright 2022 Jesse Burt
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 }
 

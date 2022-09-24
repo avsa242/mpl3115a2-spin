@@ -5,7 +5,7 @@
     Description: Driver for MPL3115A2 Pressure sensor with altimetry
     Copyright (c) 2022
     Started Feb 01, 2021
-    Updated Jul 21, 2022
+    Updated Sep 24, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -45,7 +45,7 @@ OBJ
 PUB null{}
 ' This is not a top-level object
 
-PUB Start{}: status
+PUB start{}: status
 ' Start using "standard" Propeller I2C pins and 100kHz
     return startx(DEF_SCL, DEF_SDA, DEF_HZ)
 
@@ -56,7 +56,7 @@ PUB startx(SCL_PIN, SDA_PIN, I2C_HZ): status
         if (status := i2c.init(SCL_PIN, SDA_PIN, I2C_HZ))
             time.usleep(core#T_POR)             ' wait for device startup
             if i2c.present(SLAVE_WR)            ' test device bus presence
-                if deviceid{} == core#DEVID_RESP' validate device 
+                if (dev_id{} == core#DEVID_RESP)' validate device
                     return
     ' if this point is reached, something above failed
     ' Re-check I/O pin assignments, bus speed, connections, power
@@ -77,7 +77,7 @@ PUB preset_active{}
     reset{}
     opmode(CONT)
 
-PUB altbaromode(mode): curr_mode | opmd_orig
+PUB alt_baro_mode(mode): curr_mode | opmd_orig
 ' Set sensor to altimeter or barometer mode
 '   Valid values:
 '       BARO (0): Sensor outputs barometric pressure data
@@ -99,36 +99,37 @@ PUB altbaromode(mode): curr_mode | opmd_orig
     if opmd_orig == CONT                        ' restore opmode, if it
         opmode(opmd_orig)                       ' was CONT, previously
 
-PUB altbias(offs): curr_offs
-' Set altitude bias/offset, in meters
-'   Valid values: -128..127
-'   Any other value polls the chip and returns the current setting
-    case offs
-        -128..127:                              ' LSB = 1m
-            writereg(core#OFF_H, 1, @offs)
-        other:
-            curr_offs := 0
-            readreg(core#OFF_H, 1, @curr_offs)
-            return ~curr_offs                   ' extend sign
+PUB alt_bias(offs): curr_offs
+' Get altitude bias/offset
+'   Returns: meters
+    curr_offs := 0
+    readreg(core#OFF_H, 1, @curr_offs)
+    return ~curr_offs                           ' extend sign
 
-PUB altdata{}: alt_adc
+PUB alt_data{}: alt_adc
 ' Read altimeter data
 '   NOTE: This is valid as altitude data _only_ if AltBaroMode() is
 '       set to ALT (1)
     alt_adc := 0
     readreg(core#OUT_P_MSB, 3, @alt_adc)
 
+PUB alt_set_bias(offs)
+' Set altitude bias/offset, in meters
+'   Valid values: -128..127
+    offs := (-128 #> offs <# 127)               ' LSB = 1m
+    writereg(core#OFF_H, 1, @offs)
+
 PUB altitude{}: alt_cm
 ' Read altitude, in centimeters
 '   NOTE: This is valid as altitude data _only_ if AltBaroMode() is
 '       set to ALT (1)
-    return altword2cm(altdata{})
+    return alt_word2cm(alt_data{})
 
-PUB altword2cm(alt_adc): alt_cm
+PUB alt_word2cm(alt_adc): alt_cm
 ' Convert altitude word to altitude, in centimeters
     return u64.multdiv(alt_adc, 100_00, 65536)
 
-PUB deviceid{}: id
+PUB dev_id{}: id
 ' Read device identification
 '   Returns: $C4
     readreg(core#WHO_AM_I, 1, @id)
@@ -183,20 +184,14 @@ PUB oversampling(ratio): curr_ratio | opmd_orig
     if opmd_orig == CONT                        ' restore opmode, if it
         opmode(opmd_orig)                       ' was CONT, previously
 
-PUB pressbias(offs): curr_offs
-' Set pressure bias/offset, in Pascals
-'   Valid values: -512..508
-'   Any other value polls the chip and returns the current setting
-    case offs
-        -512..508:
-            offs /= 4                           ' LSB = 4Pa
-            writereg(core#OFF_P, 1, @offs)
-        other:
-            curr_offs := 0
-            readreg(core#OFF_P, 1, @curr_offs)
-            return (~curr_offs * 4)             ' extend sign
+PUB press_bias{}: offs
+' Get pressure bias/offset
+'   Returns: Pascals
+    offs := 0
+    readreg(core#OFF_P, 1, @offs)
+    return (~offs * 4)                          ' extend sign
 
-PUB pressdata{}: press_adc
+PUB press_data{}: press_adc
 ' Read pressure data
 '   Returns: s20 (Q18.2 fixed-point)
 '   NOTE: This is valid as pressure data _only_ if AltBaroMode() is
@@ -204,11 +199,17 @@ PUB pressdata{}: press_adc
     press_adc := 0
     readreg(core#OUT_P_MSB, 3, @press_adc)
 
-PUB pressdataready{}: flag
+PUB press_data_rdy{}: flag
 ' dummy method
     return true
 
-PUB pressword2pa(p_word): p_pa
+PUB press_set_bias(offs)
+' Set pressure bias/offset, in Pascals
+'   Valid values: -512..508 (clamped to range)
+    offs := (-512 #> offs <# 508) / 4           ' LSB = 4Pa
+    writereg(core#OFF_P, 1, @offs)
+
+PUB press_word2pa(p_word): p_pa
 ' Convert pressure ADC word to pressure in Pascals
     return ((p_word * 100) / 640)
 
@@ -218,41 +219,38 @@ PUB reset{} | tmp
     writereg(core#CTRL_REG1, 1, @tmp)
     time.usleep(core#T_POR)
 
-PUB sealevelpress(press): curr_press
-' Set sea-level pressure for altitude calculations, in Pascals
-'   Valid values: 0..131_070
-'   Any other value polls the chip and returns the current setting
+PUB sea_lvl_press{}: curr_press
+' Get sea-level pressure for altitude calculations
+'   Returns: Pascals
     curr_press := 0
     readreg(core#BAR_IN_MSB, 2, @curr_press)
-    case press
-        0..131_070:
-            press >>= 1                         ' LSB = 2Pa
-        other:
-            return curr_press << 1
+    return curr_press << 1
 
+PUB set_sea_lvl_press(press)
+' Set sea-level pressure for altitude calculations, in Pascals
+'   Valid values: 0..131_070 (clamped to range)
+    press := (0 #> press <# 131_070) >> 1   ' LSB = 2Pa
     writereg(core#BAR_IN_MSB, 2, @press)
 
-PUB tempbias(offs): curr_offs
+PUB set_temp_bias(offs)
 ' Set temperature bias/offset, in ten-thousandths of a degree C
-'   Valid values: -8_0000..7_9375
-'   Any other value polls the chip and returns the current setting
-'   Example: -3_9375 = -3.9375C
-    case offs
-        -8_0000..7_9375:
-            offs /= 0_0625                      ' LSB = 0.0625C
-            writereg(core#OFF_T, 1, @offs)
-        other:
-            curr_offs := 0
-            readreg(core#OFF_T, 1, @curr_offs)
-            return (~curr_offs * 0_0625)        ' extend sign
+    offs := (-8_0000 #> offs <# 7_9375) / 0_0625' LSB = 0.0625C
+    writereg(core#OFF_T, 1, @offs)
 
-PUB tempdata{}: temp_adc
+PUB temp_bias{}: curr_offs
+' Get temperature bias/offset
+'   Returns: ten-thousandths of a degree C
+    curr_offs := 0
+    readreg(core#OFF_T, 1, @curr_offs)
+    return (~curr_offs * 0_0625)                ' extend sign
+
+PUB temp_data{}: temp_adc
 ' Read temperature data
 '   Returns: s12 (Q8.4 fixed-point)
     temp_adc := 0
     readreg(core#OUT_T_MSB, 2, @temp_adc)
 
-PUB tempword2deg(temp_word): temp
+PUB temp_word2deg(temp_word): temp
 ' Calculate temperature in degrees Celsius, given ADC word
     ' extend sign, chop off reserved LSBs, scale up to hundredths
     '   divide down to scale to degrees C
@@ -276,7 +274,7 @@ PRI readreg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
             i2c.start{}
             i2c.wr_byte(SLAVE_RD)
 
-    ' write MSByte to LSByte
+            ' write MSByte to LSByte
             i2c.rdblock_msbf(ptr_buff, nr_bytes, i2c#NAK)
             i2c.stop{}
         other:                                  ' invalid reg_nr
@@ -291,7 +289,7 @@ PRI writereg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
             i2c.start{}
             i2c.wrblock_lsbf(@cmd_pkt, 2)
 
-    ' write MSByte to LSByte
+            ' write MSByte to LSByte
             i2c.wrblock_msbf(ptr_buff, nr_bytes)
             i2c.stop{}
         other:

@@ -5,7 +5,7 @@
     Description: Driver for MPL3115A2 Pressure sensor with altimetry
     Copyright (c) 2022
     Started Feb 01, 2021
-    Updated Sep 24, 2022
+    Updated Sep 28, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -51,11 +51,10 @@ PUB start{}: status
 
 PUB startx(SCL_PIN, SDA_PIN, I2C_HZ): status
 ' Start using custom IO pins and I2C bus frequency
-    if lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31) and {
-}   I2C_HZ =< core#I2C_MAX_FREQ                 ' validate pins and bus freq
+    if (lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31) and I2C_HZ =< core#I2C_MAX_FREQ)
         if (status := i2c.init(SCL_PIN, SDA_PIN, I2C_HZ))
             time.usleep(core#T_POR)             ' wait for device startup
-            if i2c.present(SLAVE_WR)            ' test device bus presence
+            if (i2c.present(SLAVE_WR))          ' test device bus presence
                 if (dev_id{} == core#DEVID_RESP)' validate device
                     return
     ' if this point is reached, something above failed
@@ -96,7 +95,7 @@ PUB alt_baro_mode(mode): curr_mode | opmd_orig
     mode := ((curr_mode & core#ALT_MASK & core#SBYB_MASK) | mode)
     writereg(core#CTRL_REG1, 1, @mode)
 
-    if opmd_orig == CONT                        ' restore opmode, if it
+    if (opmd_orig == CONT)                      ' restore opmode, if it
         opmode(opmd_orig)                       ' was CONT, previously
 
 PUB alt_bias(offs): curr_offs
@@ -108,8 +107,7 @@ PUB alt_bias(offs): curr_offs
 
 PUB alt_data{}: alt_adc
 ' Read altimeter data
-'   NOTE: This is valid as altitude data _only_ if AltBaroMode() is
-'       set to ALT (1)
+'   NOTE: This is valid as altitude data _only_ if alt_baro_mode() is set to ALT (1)
     alt_adc := 0
     readreg(core#OUT_P_MSB, 3, @alt_adc)
 
@@ -121,8 +119,7 @@ PUB alt_set_bias(offs)
 
 PUB altitude{}: alt_cm
 ' Read altitude, in centimeters
-'   NOTE: This is valid as altitude data _only_ if AltBaroMode() is
-'       set to ALT (1)
+'   NOTE: This is valid as altitude data _only_ if alt_baro_mode() is set to ALT (1)
     return alt_word2cm(alt_data{})
 
 PUB alt_word2cm(alt_adc): alt_cm
@@ -194,7 +191,7 @@ PUB press_bias{}: offs
 PUB press_data{}: press_adc
 ' Read pressure data
 '   Returns: s20 (Q18.2 fixed-point)
-'   NOTE: This is valid as pressure data _only_ if AltBaroMode() is
+'   NOTE: This is valid as pressure data _only_ if alt_baro_mode() is
 '       set to BARO (0)
     press_adc := 0
     readreg(core#OUT_P_MSB, 3, @press_adc)
@@ -226,16 +223,11 @@ PUB sea_lvl_press{}: curr_press
     readreg(core#BAR_IN_MSB, 2, @curr_press)
     return curr_press << 1
 
-PUB set_sea_lvl_press(press)
+PUB sea_lvl_set_press(press)
 ' Set sea-level pressure for altitude calculations, in Pascals
 '   Valid values: 0..131_070 (clamped to range)
-    press := (0 #> press <# 131_070) >> 1   ' LSB = 2Pa
+    press := (0 #> press <# 131_070) >> 1       ' LSB = 2Pa
     writereg(core#BAR_IN_MSB, 2, @press)
-
-PUB set_temp_bias(offs)
-' Set temperature bias/offset, in ten-thousandths of a degree C
-    offs := (-8_0000 #> offs <# 7_9375) / 0_0625' LSB = 0.0625C
-    writereg(core#OFF_T, 1, @offs)
 
 PUB temp_bias{}: curr_offs
 ' Get temperature bias/offset
@@ -249,6 +241,11 @@ PUB temp_data{}: temp_adc
 '   Returns: s12 (Q8.4 fixed-point)
     temp_adc := 0
     readreg(core#OUT_T_MSB, 2, @temp_adc)
+
+PUB temp_set_bias(offs)
+' Set temperature bias/offset, in ten-thousandths of a degree C
+    offs := (-8_0000 #> offs <# 7_9375) / 0_0625' LSB = 0.0625C
+    writereg(core#OFF_T, 1, @offs)
 
 PUB temp_word2deg(temp_word): temp
 ' Calculate temperature in degrees Celsius, given ADC word

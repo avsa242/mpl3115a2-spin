@@ -6,7 +6,7 @@
         * Pressure data output
     Copyright (c) 2022
     Started Jun 22, 2021
-    Updated Jul 20, 2022
+    Updated Oct 16, 2022
     See end of file for terms of use.
     --------------------------------------------
 
@@ -31,8 +31,8 @@ CON
 
 OBJ
 
-    cfg:    "core.con.boardcfg.flip"
-    sensr:  "sensor.pressure.mpl3115a2"
+    cfg:    "boardcfg.flip"
+    sensor:  "sensor.pressure.mpl3115a2"
     ser:    "com.serial.terminal.ansi"
     time:   "time"
 
@@ -43,13 +43,13 @@ PUB Setup{}
     ser.clear{}
     ser.strln(string("Serial terminal started"))
 
-    if (sensr.startx(SCL_PIN, SDA_PIN, I2C_FREQ))
+    if (sensor.startx(SCL_PIN, SDA_PIN, I2C_FREQ))
         ser.strln(string("MPL3115A2 driver started"))
     else
         ser.strln(string("MPL3115A2 driver failed to start - halting"))
         repeat
 
-    sensr.preset_active{}                       ' set defaults, but enable
+    sensor.preset_active{}                       ' set defaults, but enable
                                                 '   sensor power
     demo{}
 

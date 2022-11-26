@@ -5,7 +5,7 @@
     Description: Driver for MPL3115A2 Pressure sensor with altimetry
     Copyright (c) 2022
     Started Feb 01, 2021
-    Updated Sep 28, 2022
+    Updated Nov 26, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -111,12 +111,6 @@ PUB alt_data{}: alt_adc
     alt_adc := 0
     readreg(core#OUT_P_MSB, 3, @alt_adc)
 
-PUB alt_set_bias(offs)
-' Set altitude bias/offset, in meters
-'   Valid values: -128..127
-    offs := (-128 #> offs <# 127)               ' LSB = 1m
-    writereg(core#OFF_H, 1, @offs)
-
 PUB altitude{}: alt_cm
 ' Read altitude, in centimeters
 '   NOTE: This is valid as altitude data _only_ if alt_baro_mode() is set to ALT (1)
@@ -200,12 +194,6 @@ PUB press_data_rdy{}: flag
 ' dummy method
     return true
 
-PUB press_set_bias(offs)
-' Set pressure bias/offset, in Pascals
-'   Valid values: -512..508 (clamped to range)
-    offs := (-512 #> offs <# 508) / 4           ' LSB = 4Pa
-    writereg(core#OFF_P, 1, @offs)
-
 PUB press_word2pa(p_word): p_pa
 ' Convert pressure ADC word to pressure in Pascals
     return ((p_word * 100) / 640)
@@ -223,11 +211,28 @@ PUB sea_lvl_press{}: curr_press
     readreg(core#BAR_IN_MSB, 2, @curr_press)
     return curr_press << 1
 
-PUB sea_lvl_set_press(press)
+PUB set_alt_bias(offs)
+' Set altitude bias/offset, in meters
+'   Valid values: -128..127
+    offs := (-128 #> offs <# 127)               ' LSB = 1m
+    writereg(core#OFF_H, 1, @offs)
+
+PUB set_press_bias(offs)
+' Set pressure bias/offset, in Pascals
+'   Valid values: -512..508 (clamped to range)
+    offs := (-512 #> offs <# 508) / 4           ' LSB = 4Pa
+    writereg(core#OFF_P, 1, @offs)
+
+PUB set_sea_lvl_press(press)
 ' Set sea-level pressure for altitude calculations, in Pascals
 '   Valid values: 0..131_070 (clamped to range)
     press := (0 #> press <# 131_070) >> 1       ' LSB = 2Pa
     writereg(core#BAR_IN_MSB, 2, @press)
+
+PUB set_temp_bias(offs)
+' Set temperature bias/offset, in ten-thousandths of a degree C
+    offs := (-8_0000 #> offs <# 7_9375) / 0_0625' LSB = 0.0625C
+    writereg(core#OFF_T, 1, @offs)
 
 PUB temp_bias{}: curr_offs
 ' Get temperature bias/offset
@@ -241,11 +246,6 @@ PUB temp_data{}: temp_adc
 '   Returns: s12 (Q8.4 fixed-point)
     temp_adc := 0
     readreg(core#OUT_T_MSB, 2, @temp_adc)
-
-PUB temp_set_bias(offs)
-' Set temperature bias/offset, in ten-thousandths of a degree C
-    offs := (-8_0000 #> offs <# 7_9375) / 0_0625' LSB = 0.0625C
-    writereg(core#OFF_T, 1, @offs)
 
 PUB temp_word2deg(temp_word): temp
 ' Calculate temperature in degrees Celsius, given ADC word

@@ -1,13 +1,12 @@
 {
-    --------------------------------------------
-    Filename: core.con.mpl3115a2.spin
-    Author: Jesse Burt
-    Description: MPL3115A2-specific constants
-    Copyright (c) 2021
-    Started Feb 01, 2021
-    Updated Feb 01, 2021
-    See end of file for terms of use.
-    --------------------------------------------
+----------------------------------------------------------------------------------------------------
+    Filename:       core.con.mpl3115a2.spin
+    Description:    MPL3115A2-specific constants
+    Author:         Jesse Burt
+    Started:        Feb 18, 2021
+    Updated:        Oct 16, 2024
+    Copyright (c) 2024 - See end of file for terms of use.
+----------------------------------------------------------------------------------------------------
 }
 
 CON
@@ -187,12 +186,14 @@ CON
     FM_CFS_F_STATUS = $00
     FM_CFS_F_DATA   = $01
 
-PUB null{}
+
+PUB null()
 ' This is not a top-level object
+
 
 DAT
 {
-Copyright 2022 Jesse Burt
+Copyright 2024 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,

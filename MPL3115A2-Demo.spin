@@ -6,7 +6,7 @@
     Author:         Jesse Burt
     Started:        Jun 22, 2021
     Updated:        Oct 16, 2024
-    Copyright (c) 2024 - See end of file for terms of use.
+    Copyright (c) 2025 - See end of file for terms of use.
 ----------------------------------------------------------------------------------------------------
 }
 
@@ -37,9 +37,9 @@ PUB main() | press, temp, tscl
     repeat
         repeat until sensor.press_data_rdy()
         press := sensor.press_pascals()
-        ser.printf2(@"Press (hPa/mbar): %4.4d.%02.2d\n\r", (press / 1000), ||(press // 1000))
+        ser.printf(@"Press (hPa/mbar): %4.4d.%02.2d\n\r", (press / 1000), ||(press // 1000))
         temp := sensor.temperature()
-        tscl := lookupz(sensor.temp_scale(-2): "C", "F", "K")
+        tscl := lookupz(sensor.temp_scale(): "C", "F", "K")
         ser.printf3(@"Temp. (deg %c): %3.3d.%02.2d\n\r", tscl, (temp / 100), ||(temp // 100))
 
 
@@ -59,7 +59,7 @@ PUB setup()
 
 DAT
 {
-Copyright 2024 Jesse Burt
+Copyright 2025 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,

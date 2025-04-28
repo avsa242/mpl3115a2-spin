@@ -4,8 +4,8 @@
     Description:    Driver for MPL3115A2 Pressure sensor with altimetry
     Author:         Jesse Burt
     Started:        Feb 18, 2021
-    Updated:        Oct 16, 2024
-    Copyright (c) 2024 - See end of file for terms of use.
+    Updated:        Apr 28, 2025
+    Copyright (c) 2025 - See end of file for terms of use.
 ----------------------------------------------------------------------------------------------------
 }
 
@@ -85,58 +85,55 @@ PUB preset_active()
     opmode(CONT)
 
 
-PUB alt_baro_mode(mode=-2): curr_mode | opmd_orig
+PUB alt_baro_mode(m=-2): c | opmd_orig
 ' Set sensor to altimeter or barometer mode
 '   Valid values:
 '       BARO (0): Sensor outputs barometric pressure data
 '       ALT (1): Sensor outputs altitude data
-    curr_mode := 0
-    readreg(core.CTRL_REG1, 1, @curr_mode)
-    case mode
+    c := readreg(core.CTRL_REG1)
+    case m
         BARO, ALT:
-            mode <<= core.ALT
+            m <<= core.ALT
         other:
-            return ((curr_mode >> core.ALT) & 1)
+            return ((c >> core.ALT) & 1)
 
-    opmd_orig := (curr_mode & 1)                ' get current opmode
+    opmd_orig := (c & 1)                ' get current opmode
     ' must be in standby/SINGLE mode to set certain bits in this reg, so
     '   clear the opmode bit
-    mode := ((curr_mode & core.ALT_MASK & core.SBYB_MASK) | mode)
-    writereg(core.CTRL_REG1, 1, @mode)
+    m := ((c & core.ALT_MASK & core.SBYB_MASK) | m)
+    writereg(core.CTRL_REG1, m)
 
     if (opmd_orig == CONT)                      ' restore opmode, if it
         opmode(opmd_orig)                       ' was CONT, previously
 
 
-PUB alt_bias(offs): curr_offs
+PUB alt_bias(o): c
 ' Get altitude bias/offset
 '   Returns: meters
-    curr_offs := 0
-    readreg(core.OFF_H, 1, @curr_offs)
+    c := readreg(core.OFF_H)
     return (curr_offs signx 7)                  ' extend sign
 
 
-PUB alt_data(): alt_adc
+PUB alt_data(): a
 ' Read altimeter data
 '   NOTE: This is valid as altitude data _only_ if alt_baro_mode() is set to ALT (1)
-    alt_adc := 0
-    readreg(core.OUT_P_MSB, 3, @alt_adc)
+    return readreg(core.OUT_P_MSB, 3)
 
 
-PUB alt_set_bias(offs)
+PUB alt_set_bias(o)
 ' Set altitude bias/offset, in meters
 '   Valid values: -128..127
-    offs := (-128 #> offs <# 127)               ' LSB = 1m
-    writereg(core.OFF_H, 1, @offs)
+    o := (-128 #> o <# 127)                     ' LSB = 1m
+    writereg(core.OFF_H, o)
 
 
-PUB altitude(): alt_cm
+PUB altitude(): a
 ' Read altitude, in centimeters
 '   NOTE: This is valid as altitude data _only_ if alt_baro_mode() is set to ALT (1)
-    return alt_word2cm(alt_data())
+    return alt_word2cm( alt_data() )
 
 
-PUB alt_word2cm(alt_adc): alt_cm
+PUB alt_word2cm(alt_adc): a
 ' Convert altitude word to altitude, in centimeters
     return muldiv64(alt_adc, 100_00, 65536)
 
@@ -144,81 +141,76 @@ PUB alt_word2cm(alt_adc): alt_cm
 PUB dev_id(): id
 ' Read device identification
 '   Returns: $C4
-    readreg(core.WHO_AM_I, 1, @id)
+    return readreg(core.WHO_AM_I)
 
 
-PUB measure() | tmp, meas
+PUB measure() | tmp
 ' Perform measurement
-    tmp := 0
-    readreg(core.CTRL_REG1, 1, @tmp)
+    tmp := readreg(core.CTRL_REG1)
     case opmode()
         SINGLE:
             tmp |= (1 << core.OST)              ' bit auto-clears in SINGLE
-            writereg(core.CTRL_REG1, 1, @tmp)   '   mode
+            writereg(core.CTRL_REG1, tmp)       '   mode
         CONT:
             tmp |= (1 << core.OST)
-            writereg(core.CTRL_REG1, 1, @tmp)
+            writereg(core.CTRL_REG1, tmp)
             tmp &= core.OST_MASK                ' bit doesn't auto-clear in
-            writereg(core.CTRL_REG1, 1, @tmp)   '   CONT mode; do it manually
+            writereg(core.CTRL_REG1, tmp)       '   CONT mode; do it manually
 
 
-PUB opmode(mode=-2): curr_mode
+PUB opmode(m=-2): c
 ' Set operating mode
 '   Valid values:
 '       SINGLE (0): Single-shot/standby
 '       CONT (1): Continuous measurement
-    curr_mode := 0
-    readreg(core.CTRL_REG1, 1, @curr_mode)
-    case mode
+    c := readreg(core.CTRL_REG1)
+    case m
         SINGLE, CONT:
         other:
-            return (curr_mode & 1)
+            return (c & 1)
 
-    mode := ((curr_mode & core.SBYB_MASK) | mode)
-    writereg(core.CTRL_REG1, 1, @mode)
+    m := ((c & core.SBYB_MASK) | m)
+    writereg(core.CTRL_REG1, m)
 
 
-PUB oversampling(ratio=-2): curr_ratio | opmd_orig
+PUB oversampling(r=-2): c | opmd_orig
 ' Set output data ratio
 '   Valid values: 1, 2, 4, 8, 16, 32, 64, 128
 '   Any other value polls the chip and returns the current setting
-    curr_ratio := 0
-    readreg(core.CTRL_REG1, 1, @curr_ratio)
-    case ratio
+    c := readreg(core.CTRL_REG1)
+    case r
         1, 2, 4, 8, 16, 32, 64, 128:
-            ratio := lookdownz(ratio: 1, 2, 4, 8, 16, 32, 64, 128) << core.OS
+            r := lookdownz(ratio: 1, 2, 4, 8, 16, 32, 64, 128) << core.OS
         other:
-            curr_ratio := (curr_ratio >> core.OS) & core.OS_BITS
-            return lookupz(curr_ratio: 1, 2, 4, 8, 16, 32, 64, 128)
+            c := (c >> core.OS) & core.OS_BITS
+            return lookupz(c: 1, 2, 4, 8, 16, 32, 64, 128)
 
-    opmd_orig := (curr_ratio & 1)               ' get current opmode
+    opmd_orig := (c & 1)               ' get current opmode
     ' must be in standby/SINGLE mode to set certain bits in this reg, so
     '   clear the opmode bit
-    ratio := ((curr_ratio & core.OS_MASK & core.SBYB_MASK) | ratio)
-    writereg(core.CTRL_REG1, 1, @ratio)
-    if opmd_orig == CONT                        ' restore opmode, if it
+    ratio := ((c & core.OS_MASK & core.SBYB_MASK) | r)
+    writereg(core.CTRL_REG1, ratio)
+    if (opmd_orig == CONT)                      ' restore opmode, if it
         opmode(opmd_orig)                       ' was CONT, previously
 
 
-PUB press_bias(): offs
+PUB press_bias(): o
 ' Get pressure bias/offset
 '   Returns: Pascals
-    offs := 0
-    readreg(core.OFF_P, 1, @offs)
-    return ((offs signx 7) * 4)                 ' extend sign
+    o := readreg(core.OFF_P)
+    return ((o signx 7)     * 4)                 ' extend sign
 
 
-PUB press_data(): press_adc
+PUB press_data(): p
 ' Read pressure data
 '   Returns: s20 (Q18.2 fixed-point)
 '   NOTE: This is valid as pressure data _only_ if alt_baro_mode() is
 '       set to BARO (0)
-    press_adc := 0
-    readreg(core.OUT_P_MSB, 3, @press_adc)
+    return readreg(core.OUT_P_MSB, 3)
 
 
-PUB press_data_rdy(): flag
-' dummy method
+PUB press_data_rdy(): f
+' dummy method for compatibility with other drivers
     return true
 
 
@@ -226,10 +218,10 @@ PUB press_set_bias(offs)
 ' Set pressure bias/offset, in Pascals
 '   Valid values: -512..508 (clamped to range)
     offs := (-512 #> offs <# 508) / 4           ' LSB = 4Pa
-    writereg(core.OFF_P, 1, @offs)
+    writereg(core.OFF_P, offs)
 
 
-PUB press_word2pa(p_word): p_pa
+PUB press_word2pa(p_word): p
 ' Convert pressure ADC word to pressure in Pascals
     return ((p_word * 100) / 640)
 
@@ -237,44 +229,40 @@ PUB press_word2pa(p_word): p_pa
 PUB reset() | tmp
 ' Reset the device
     tmp := (1 << core.RST)
-    writereg(core.CTRL_REG1, 1, @tmp)
+    writereg(core.CTRL_REG1, tmp)
     waitus(core.T_POR)
 
 
-PUB sea_lvl_press(): curr_press
+PUB sea_lvl_press(): p
 ' Get sea-level pressure for altitude calculations
 '   Returns: Pascals
-    curr_press := 0
-    readreg(core.BAR_IN_MSB, 2, @curr_press)
-    return curr_press << 1
+    return readreg(core.BAR_IN_MSB, 2) << 1
 
 
-PUB sea_lvl_set_press(press)
+PUB sea_lvl_set_press(p)
 ' Set sea-level pressure for altitude calculations, in Pascals
 '   Valid values: 0..131_070 (clamped to range)
-    press := (0 #> press <# 131_070) >> 1       ' LSB = 2Pa
-    writereg(core.BAR_IN_MSB, 2, @press)
+    p := (0 #> p <# 131_070) >>         1       ' LSB = 2Pa
+    writereg(core.BAR_IN_MSB, p, 2)
 
 
-PUB temp_bias(): curr_offs
+PUB temp_bias(): o
 ' Get temperature bias/offset
 '   Returns: ten-thousandths of a degree C
-    curr_offs := 0
-    readreg(core.OFF_T, 1, @curr_offs)
-    return ((curr_offs signx 7) * 0_0625)       ' extend sign
+    o := readreg(core.OFF_T)
+    return ((o signx 7) * 0_0625)       ' extend sign
 
 
-PUB temp_data(): temp_adc
+PUB temp_data(): t
 ' Read temperature data
 '   Returns: s12 (Q8.4 fixed-point)
-    temp_adc := 0
-    readreg(core.OUT_T_MSB, 2, @temp_adc)
+    return readreg(core.OUT_T_MSB, 2)
 
 
-PUB temp_set_bias(offs)
+PUB temp_set_bias(o)
 ' Set temperature bias/offset, in ten-thousandths of a degree C
-    offs := (-8_0000 #> offs <# 7_9375) / 0_0625' LSB = 0.0625C
-    writereg(core.OFF_T, 1, @offs)
+    o := (-8_0000 #> offs <# 7_9375) / 0_0625' LSB = 0.0625C
+    writereg(core.OFF_T, o)
 
 
 PUB temp_word2deg(temp_word): temp
@@ -291,25 +279,25 @@ PUB temp_word2deg(temp_word): temp
             return FALSE
 
 
-PRI readreg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
+PRI readreg(reg_nr, len=1): v | cmd_pkt
 ' Read nr_bytes from the device into ptr_buff
     case reg_nr                                 ' validate register num
         core.STATUS..core.OFF_H:
             cmd_pkt.byte[0] := SLAVE_WR
             cmd_pkt.byte[1] := reg_nr
+            v := 0
             i2c.start()
             i2c.wrblock_lsbf(@cmd_pkt, 2)
             i2c.start()
             i2c.wr_byte(SLAVE_RD)
-
-            ' write MSByte to LSByte
-            i2c.rdblock_msbf(ptr_buff, nr_bytes, i2c.NAK)
+            i2c.rdblock_msbf(@v, len, i2c.NAK)
             i2c.stop()
+            return
         other:                                  ' invalid reg_nr
             return
 
 
-PRI writereg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
+PRI writereg(reg_nr, val, len=1) | cmd_pkt
 ' Write nr_bytes to the device from ptr_buff
     case reg_nr
         core.F_SETUP, core.PT_DATA_CFG..core.OFF_H:
@@ -317,9 +305,7 @@ PRI writereg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
             cmd_pkt.byte[1] := reg_nr
             i2c.start()
             i2c.wrblock_lsbf(@cmd_pkt, 2)
-
-            ' write MSByte to LSByte
-            i2c.wrblock_msbf(ptr_buff, nr_bytes)
+            i2c.wrblock_msbf(@val, len)
             i2c.stop()
         other:
             return
@@ -327,7 +313,7 @@ PRI writereg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
 
 DAT
 {
-Copyright 2024 Jesse Burt
+Copyright 2025 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,

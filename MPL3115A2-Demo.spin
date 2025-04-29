@@ -35,7 +35,6 @@ PUB main() | press, temp, tscl
     sensor.temp_scale(sensor.C)                 ' C, F
 
     repeat
-        repeat until sensor.press_data_rdy()
         press := sensor.press_pascals()
         ser.pos_xy(0, 3)
         ser.printf(@"Press (hPa/mbar): %4.4d.%02.2d\n\r", (press / 1000), ||(press // 1000))

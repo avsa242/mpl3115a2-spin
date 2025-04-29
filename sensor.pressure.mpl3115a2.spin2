@@ -9,8 +9,8 @@
 ----------------------------------------------------------------------------------------------------
 }
 
-#include "sensor.pressure.common.spin2h"            ' use code common to all pressure/alt
-#include "sensor.temp.common.spin2h"                '   and temperature sensor drivers
+#include "sensor.pressure.common.spin2h"        ' use code common to all pressure/alt
+#include "sensor.temp.common.spin2h"            '   and temperature sensor drivers
 
 CON
 
@@ -79,8 +79,8 @@ PUB defaults()
 
 
 PUB preset_active()
-' Like Defaults(), but
-'   * continuous sensor measurement
+' Preset settings:
+'   * set to power-on defaults and enable continuous sensor measurement
     reset()
     opmode(CONT)
 
@@ -93,25 +93,22 @@ PUB alt_baro_mode(m=-2): c | opmd_orig
     c := readreg(core.CTRL_REG1)
     case m
         BARO, ALT:
-            m <<= core.ALT
+            opmd_orig := (c & 1)                ' get current opmode
+            ' must be in standby/SINGLE mode to set certain bits in this reg, so
+            '   clear the opmode bit
+            m := ( (c & core.ALT_MASK & core.SBYB_MASK) | (m << core.ALT) )
+            writereg(core.CTRL_REG1, m)
+            if (opmd_orig == CONT)              ' restore opmode, if it
+                opmode(opmd_orig)               ' was CONT, previously
         other:
             return ((c >> core.ALT) & 1)
-
-    opmd_orig := (c & 1)                ' get current opmode
-    ' must be in standby/SINGLE mode to set certain bits in this reg, so
-    '   clear the opmode bit
-    m := ((c & core.ALT_MASK & core.SBYB_MASK) | m)
-    writereg(core.CTRL_REG1, m)
-
-    if (opmd_orig == CONT)                      ' restore opmode, if it
-        opmode(opmd_orig)                       ' was CONT, previously
 
 
 PUB alt_bias(o): c
 ' Get altitude bias/offset
 '   Returns: meters
     c := readreg(core.OFF_H)
-    return (curr_offs signx 7)                  ' extend sign
+    return (c signx 7)                          ' extend sign
 
 
 PUB alt_data(): a
@@ -123,8 +120,7 @@ PUB alt_data(): a
 PUB alt_set_bias(o)
 ' Set altitude bias/offset, in meters
 '   Valid values: -128..127
-    o := (-128 #> o <# 127)                     ' LSB = 1m
-    writereg(core.OFF_H, o)
+    writereg(core.OFF_H, (-128 #> o <# 127) )   ' LSB = 1m
 
 
 PUB altitude(): a
@@ -133,9 +129,9 @@ PUB altitude(): a
     return alt_word2cm( alt_data() )
 
 
-PUB alt_word2cm(alt_adc): a
+PUB alt_word2cm(w): a
 ' Convert altitude word to altitude, in centimeters
-    return muldiv64(alt_adc, 100_00, 65536)
+    return muldiv64(w, 100_00, 65536)           ' (adc word * 10,000) / 65536
 
 
 PUB dev_id(): id
@@ -166,39 +162,37 @@ PUB opmode(m=-2): c
     c := readreg(core.CTRL_REG1)
     case m
         SINGLE, CONT:
+            m := ( (c & core.SBYB_MASK) | m)
+            writereg(core.CTRL_REG1, m)
         other:
             return (c & 1)
 
-    m := ((c & core.SBYB_MASK) | m)
-    writereg(core.CTRL_REG1, m)
-
 
 PUB oversampling(r=-2): c | opmd_orig
-' Set output data ratio
-'   Valid values: 1, 2, 4, 8, 16, 32, 64, 128
+' Set output data oversampling ratio
+'   Valid values: 1, 2, 4, 8, 16, 32, 64, 128 (default: 1)
 '   Any other value polls the chip and returns the current setting
     c := readreg(core.CTRL_REG1)
     case r
-        1, 2, 4, 8, 16, 32, 64, 128:
-            r := lookdownz(ratio: 1, 2, 4, 8, 16, 32, 64, 128) << core.OS
+        1..128:
+            r := encod(r) << core.OS            ' map 1..128 to bit 0..7
+            opmd_orig := (c & 1)                ' get current opmode
+            ' must be in standby/SINGLE mode to set certain bits in this reg, so
+            '   clear the opmode bit
+            r := ((c & core.OS_MASK & core.SBYB_MASK) | r)
+            writereg(core.CTRL_REG1, r)
+            if (opmd_orig == CONT)              ' restore opmode, if it
+                opmode(opmd_orig)               ' was CONT, previously
         other:
             c := (c >> core.OS) & core.OS_BITS
-            return lookupz(c: 1, 2, 4, 8, 16, 32, 64, 128)
-
-    opmd_orig := (c & 1)               ' get current opmode
-    ' must be in standby/SINGLE mode to set certain bits in this reg, so
-    '   clear the opmode bit
-    ratio := ((c & core.OS_MASK & core.SBYB_MASK) | r)
-    writereg(core.CTRL_REG1, ratio)
-    if (opmd_orig == CONT)                      ' restore opmode, if it
-        opmode(opmd_orig)                       ' was CONT, previously
+            return decod(c)                     ' map bit 0..7 to 1..128
 
 
 PUB press_bias(): o
 ' Get pressure bias/offset
 '   Returns: Pascals
     o := readreg(core.OFF_P)
-    return ((o signx 7)     * 4)                 ' extend sign
+    return ( (o signx 7) * 4)                   ' extend sign
 
 
 PUB press_data(): p
@@ -221,9 +215,9 @@ PUB press_set_bias(offs)
     writereg(core.OFF_P, offs)
 
 
-PUB press_word2pa(p_word): p
+PUB press_word2pa(w): p
 ' Convert pressure ADC word to pressure in Pascals
-    return ((p_word * 100) / 640)
+    return ( (w * 100) / 640)
 
 
 PUB reset() | tmp
@@ -242,7 +236,7 @@ PUB sea_lvl_press(): p
 PUB sea_lvl_set_press(p)
 ' Set sea-level pressure for altitude calculations, in Pascals
 '   Valid values: 0..131_070 (clamped to range)
-    p := (0 #> p <# 131_070) >>         1       ' LSB = 2Pa
+    p := (0 #> p <# 131_070) >> 1               ' LSB = 2Pa
     writereg(core.BAR_IN_MSB, p, 2)
 
 
@@ -250,7 +244,7 @@ PUB temp_bias(): o
 ' Get temperature bias/offset
 '   Returns: ten-thousandths of a degree C
     o := readreg(core.OFF_T)
-    return ((o signx 7) * 0_0625)       ' extend sign
+    return ( (o signx 7) * 0_0625)              ' extend sign
 
 
 PUB temp_data(): t
@@ -261,20 +255,23 @@ PUB temp_data(): t
 
 PUB temp_set_bias(o)
 ' Set temperature bias/offset, in ten-thousandths of a degree C
-    o := (-8_0000 #> offs <# 7_9375) / 0_0625' LSB = 0.0625C
+    o := (-8_0000 #> o <# 7_9375) / 0_0625      ' LSB = 0.0625C
     writereg(core.OFF_T, o)
 
 
-PUB temp_word2deg(temp_word): temp
-' Calculate temperature in degrees Celsius, given ADC word
+PUB temp_word2deg(w): t
+' Calculate temperature from ADC word
+'   w:          temperature ADC word
+'   Returns:    temperature in hundredths of a degree in chosen scale
+
     ' extend sign, chop off reserved LSBs, scale up to hundredths
     '   divide down to scale to degrees C
-    temp := (((temp_word signx 15) sar 4) * 100) / 16
+    t := ( ( (w signx 15) sar 4) * 100) / 16
     case _temp_scale
         C:
-            return temp
+            return t
         F:
-            return ((temp * 9) / 5) + 32_00
+            return ((t * 9) / 5) + 32_00
         other:
             return FALSE
 

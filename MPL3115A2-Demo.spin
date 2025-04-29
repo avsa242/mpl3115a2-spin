@@ -5,7 +5,7 @@
         * Pressure data output
     Author:         Jesse Burt
     Started:        Jun 22, 2021
-    Updated:        Oct 16, 2024
+    Updated:        Apr 29, 2025
     Copyright (c) 2025 - See end of file for terms of use.
 ----------------------------------------------------------------------------------------------------
 }
@@ -37,6 +37,7 @@ PUB main() | press, temp, tscl
     repeat
         repeat until sensor.press_data_rdy()
         press := sensor.press_pascals()
+        ser.pos_xy(0, 3)
         ser.printf(@"Press (hPa/mbar): %4.4d.%02.2d\n\r", (press / 1000), ||(press // 1000))
         temp := sensor.temperature()
         tscl := lookupz(sensor.temp_scale(): "C", "F", "K")
